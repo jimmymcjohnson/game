@@ -2,118 +2,174 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Dodge the Blocks</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dodge the Blocks: Turbo</title>
   <style>
     body {
       margin: 0;
-      background: #111;
-      color: white;
-      font-family: Arial, sans-serif;
-      text-align: center;
+      background: #0d0d0d;
+      color: #00ffcc;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      overflow: hidden;
     }
     canvas {
-      background: #222;
-      display: block;
-      margin: 20px auto;
-      border: 2px solid #fff;
+      background: #1a1a1a;
+      border: 3px solid #00ffcc;
+      box-shadow: 0 0 20px #00ffcc55;
+      border-radius: 8px;
     }
+    .stats {
+      display: flex;
+      gap: 20px;
+      font-size: 1.2rem;
+      margin-bottom: 10px;
+      text-transform: uppercase;
+      letter-spacing: 2px;
+    }
+    .controls { color: #888; margin-top: 10px; font-size: 0.9rem; }
   </style>
 </head>
 <body>
 
-<h1>Dodge the Blocks</h1>
-<p>Use ← → arrow keys</p>
-<canvas id="game" width="400" height="500"></canvas>
-<p id="score">Score: 0</p>
+<div class="stats">
+  <div>Score: <span id="score">0</span></div>
+  <div>High: <span id="highScore">0</span></div>
+</div>
+
+<canvas id="game" width="400" height="600"></canvas>
+
+<div class="controls">ARROWS to Move • R to Restart</div>
 
 <script>
   const canvas = document.getElementById("game");
   const ctx = canvas.getContext("2d");
+  const scoreEl = document.getElementById("score");
+  const highEl = document.getElementById("highScore");
 
-  let player = {
-    x: 180,
-    y: 450,
-    width: 40,
-    height: 40,
-    speed: 6
-  };
+  // Game State
+  let player, blocks, score, highScore, gameOver, frameCount, spawnRate;
 
-  let blocks = [];
-  let score = 0;
-  let gameOver = false;
+  function init() {
+    player = { x: 180, y: 530, w: 40, h: 40, speed: 8, color: "#00ffcc" };
+    blocks = [];
+    score = 0;
+    gameOver = false;
+    frameCount = 0;
+    spawnRate = 50; // Spawn a block every 50 frames
+    highScore = localStorage.getItem("highScore") || 0;
+    highEl.textContent = highScore;
+    loop();
+  }
+
+  const keys = {};
+  window.addEventListener("keydown", e => {
+    keys[e.key] = true;
+    if (e.key.toLowerCase() === 'r' && gameOver) init();
+  });
+  window.addEventListener("keyup", e => keys[e.key] = false);
 
   function spawnBlock() {
+    // Difficulty scaling: Blocks get faster over time
+    const speedBoost = Math.min(score / 1000, 5); 
     blocks.push({
       x: Math.random() * (canvas.width - 30),
       y: -30,
-      width: 30,
-      height: 30,
-      speed: 3 + Math.random() * 2
+      w: 20 + Math.random() * 30,
+      h: 20 + Math.random() * 30,
+      speed: 4 + speedBoost + Math.random() * 2,
+      color: `hsl(${Math.random() * 40}, 100%, 60%)` // Random fiery colors
     });
   }
-
-  setInterval(spawnBlock, 800);
-
-  let keys = {};
-  document.addEventListener("keydown", e => keys[e.key] = true);
-  document.addEventListener("keyup", e => keys[e.key] = false);
 
   function update() {
     if (gameOver) return;
 
-    if (keys["ArrowLeft"] && player.x > 0) {
-      player.x -= player.speed;
-    }
-    if (keys["ArrowRight"] && player.x < canvas.width - player.width) {
-      player.x += player.speed;
-    }
+    // Movement
+    if (keys["ArrowLeft"] && player.x > 0) player.x -= player.speed;
+    if (keys["ArrowRight"] && player.x < canvas.width - player.w) player.x += player.speed;
 
-    blocks.forEach(block => {
+    // Spawning (faster as score grows)
+    frameCount++;
+    const currentSpawnRate = Math.max(15, spawnRate - Math.floor(score / 500));
+    if (frameCount % currentSpawnRate === 0) spawnBlock();
+
+    // Block Logic
+    blocks.forEach((block, index) => {
       block.y += block.speed;
 
+      // Collision (AABB)
       if (
-        block.x < player.x + player.width &&
-        block.x + block.width > player.x &&
-        block.y < player.y + player.height &&
-        block.y + block.height > player.y
+        player.x < block.x + block.w &&
+        player.x + player.w > block.x &&
+        player.y < block.y + block.h &&
+        player.y + player.h > block.y
       ) {
-        gameOver = true;
+        endGame();
+      }
+
+      // Remove off-screen blocks
+      if (block.y > canvas.height) {
+        blocks.splice(index, 1);
+        score += 10;
       }
     });
 
-    blocks = blocks.filter(block => block.y < canvas.height + 50);
+    scoreEl.textContent = score;
+  }
 
-    score++;
-    document.getElementById("score").textContent = "Score: " + score;
+  function endGame() {
+    gameOver = true;
+    if (score > highScore) {
+      localStorage.setItem("highScore", score);
+    }
   }
 
   function draw() {
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    // Trail effect (slight transparency instead of full clear)
+    ctx.fillStyle = "rgba(26, 26, 26, 0.4)";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    // Player
-    ctx.fillStyle = "#00ffcc";
-    ctx.fillRect(player.x, player.y, player.width, player.height);
+    // Player with Glow
+    ctx.shadowBlur = 15;
+    ctx.shadowColor = player.color;
+    ctx.fillStyle = player.color;
+    ctx.fillRect(player.x, player.y, player.w, player.h);
 
     // Blocks
-    ctx.fillStyle = "#ff4444";
+    ctx.shadowBlur = 10;
     blocks.forEach(block => {
-      ctx.fillRect(block.x, block.y, block.width, block.height);
+      ctx.shadowColor = block.color;
+      ctx.fillStyle = block.color;
+      ctx.fillRect(block.x, block.y, block.w, block.h);
     });
 
+    // Reset shadow for text
+    ctx.shadowBlur = 0;
+
     if (gameOver) {
+      ctx.fillStyle = "rgba(0,0,0,0.7)";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
       ctx.fillStyle = "white";
-      ctx.font = "30px Arial";
-      ctx.fillText("GAME OVER", 100, 250);
+      ctx.font = "bold 40px Arial";
+      ctx.textAlign = "center";
+      ctx.fillText("CRASHED", canvas.width / 2, canvas.height / 2);
+      ctx.font = "20px Arial";
+      ctx.fillText("Press 'R' to Reboot", canvas.width / 2, canvas.height / 2 + 50);
     }
   }
 
   function loop() {
     update();
     draw();
-    requestAnimationFrame(loop);
+    if (!gameOver) requestAnimationFrame(loop);
   }
 
-  loop();
+  init();
 </script>
 
 </body>
