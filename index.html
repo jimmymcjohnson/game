@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Dodge the Blocks</title>
+  <style>
+    body {
+      margin: 0;
+      background: #111;
+      color: white;
+      font-family: Arial, sans-serif;
+      text-align: center;
+    }
+    canvas {
+      background: #222;
+      display: block;
+      margin: 20px auto;
+      border: 2px solid #fff;
+    }
+  </style>
+</head>
+<body>
+
+<h1>Dodge the Blocks</h1>
+<p>Use ← → arrow keys</p>
+<canvas id="game" width="400" height="500"></canvas>
+<p id="score">Score: 0</p>
+
+<script>
+  const canvas = document.getElementById("game");
+  const ctx = canvas.getContext("2d");
+
+  let player = {
+    x: 180,
+    y: 450,
+    width: 40,
+    height: 40,
+    speed: 6
+  };
+
+  let blocks = [];
+  let score = 0;
+  let gameOver = false;
+
+  function spawnBlock() {
+    blocks.push({
+      x: Math.random() * (canvas.width - 30),
+      y: -30,
+      width: 30,
+      height: 30,
+      speed: 3 + Math.random() * 2
+    });
+  }
+
+  setInterval(spawnBlock, 800);
+
+  let keys = {};
+  document.addEventListener("keydown", e => keys[e.key] = true);
+  document.addEventListener("keyup", e => keys[e.key] = false);
+
+  function update() {
+    if (gameOver) return;
+
+    if (keys["ArrowLeft"] && player.x > 0) {
+      player.x -= player.speed;
+    }
+    if (keys["ArrowRight"] && player.x < canvas.width - player.width) {
+      player.x += player.speed;
+    }
+
+    blocks.forEach(block => {
+      block.y += block.speed;
+
+      if (
+        block.x < player.x + player.width &&
+        block.x + block.width > player.x &&
+        block.y < player.y + player.height &&
+        block.y + block.height > player.y
+      ) {
+        gameOver = true;
+      }
+    });
+
+    blocks = blocks.filter(block => block.y < canvas.height + 50);
+
+    score++;
+    document.getElementById("score").textContent = "Score: " + score;
+  }
+
+  function draw() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // Player
+    ctx.fillStyle = "#00ffcc";
+    ctx.fillRect(player.x, player.y, player.width, player.height);
+
+    // Blocks
+    ctx.fillStyle = "#ff4444";
+    blocks.forEach(block => {
+      ctx.fillRect(block.x, block.y, block.width, block.height);
+    });
+
+    if (gameOver) {
+      ctx.fillStyle = "white";
+      ctx.font = "30px Arial";
+      ctx.fillText("GAME OVER", 100, 250);
+    }
+  }
+
+  function loop() {
+    update();
+    draw();
+    requestAnimationFrame(loop);
+  }
+
+  loop();
+</script>
+
+</body>
+</html>
